@@ -9,6 +9,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import couchbase.test.sdk.*;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
@@ -28,19 +29,17 @@ import com.couchbase.client.java.kv.RemoveOptions;
 import com.couchbase.client.java.kv.UpsertOptions;
 import couchbase.test.docgen.DocType.Person;
 import couchbase.test.docgen.DocumentGenerator;
-import couchbase.test.sdk.DocOps;
-import couchbase.test.sdk.Loader;
-import couchbase.test.sdk.SDKClient;
 import couchbase.test.taskmanager.Task;
 
-import couchbase.test.sdk.Result;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
 public class WorkLoadGenerate extends Task{
     DocumentGenerator dg;
     public SDKClient sdk;
+    public RestSDKClient restSDKClient;
     public DocOps docops;
+    public DocOpsRest docOpsRest;
     public String durability;
     public HashMap<String, List<Result>> failedMutations = new HashMap<String, List<Result>>();
     public boolean trackFailures = true;
@@ -53,21 +52,31 @@ public class WorkLoadGenerate extends Task{
     public InsertOptions setOptions;
     public RemoveOptions removeOptions;
     public GetOptions getOptions;
+    public String sdkServer;
+    public String sdkServerLocation;
     static Logger logger = LogManager.getLogger(WorkLoadGenerate.class);
 
-    public WorkLoadGenerate(String taskName, DocumentGenerator dg, SDKClient client, String durability) {
+    public WorkLoadGenerate(String taskName, DocumentGenerator dg, SDKClient client, String durability, String sdkServer, String sdkServerLocation) {
         super(taskName);
         this.dg = dg;
         this.docops = new DocOps();
+        this.docOpsRest = new DocOpsRest();
         this.sdk = client;
+        this.sdkServer = sdkServer;
+        this.sdkServerLocation  = sdkServerLocation;
+        this.restSDKClient = new RestSDKClient(client.master, client.bucket, client.scope, client.scope, this.sdkServer, this.sdkServerLocation);
         this.durability = durability;
     }
 
-    public WorkLoadGenerate(String taskName, DocumentGenerator dg, SDKClient client, String durability, int exp, String exp_unit, boolean trackFailures, int retryTimes) {
+    public WorkLoadGenerate(String taskName, DocumentGenerator dg, SDKClient client, String durability, int exp, String exp_unit, boolean trackFailures, int retryTimes, String sdkServer, String sdkServerLocation) {
         super(taskName);
         this.dg = dg;
         this.docops = new DocOps();
+        this.docOpsRest = new DocOpsRest();
         this.sdk = client;
+        this.sdkServer = sdkServer;
+        this.sdkServerLocation  = sdkServerLocation;
+        this.restSDKClient = new RestSDKClient(client.master, client.bucket, client.scope, client.scope, this.sdkServer, this.sdkServerLocation);
         this.durability = durability;
         this.trackFailures = trackFailures;
         this.retryTimes = retryTimes;
@@ -76,11 +85,16 @@ public class WorkLoadGenerate extends Task{
     }
 
     public WorkLoadGenerate(String taskName, DocumentGenerator dg, SDKClient client, String durability,
-            int exp, String exp_unit, boolean trackFailures, int retryTimes, String retryStrategy) {
+            int exp, String exp_unit, boolean trackFailures, int retryTimes, String retryStrategy, String sdkServer, String sdkServerLocation) {
         super(taskName);
         this.dg = dg;
         this.docops = new DocOps();
+        this.docOpsRest = new DocOpsRest();
         this.sdk = client;
+        this.sdkServer = sdkServer;
+        this.sdkServerLocation  = sdkServerLocation;
+        this.restSDKClient = new RestSDKClient(client.master, client.bucket, client.scope, client.scope, this.sdkServer, this.sdkServerLocation);
+        this.restSDKClient.initialiseSDK();
         this.durability = durability;
         this.trackFailures = trackFailures;
         this.retryTimes = retryTimes;
@@ -134,7 +148,9 @@ public class WorkLoadGenerate extends Task{
                 List<Tuple2<String, Object>> docs = dg.nextInsertBatch();
                 if (docs.size()>0) {
                     flag = true;
-                    List<Result> result = docops.bulkInsert(this.sdk.connection, docs, setOptions);
+                    List<Result> result = docOpsRest.bulkInsert(this.restSDKClient, this.sdk.bucket, this.sdk.scope,
+                            this.sdk.collection, docs, 60, "seconds", this.retryStrategy, this.durability);
+                    //List<Result> result = docops.bulkInsert(this.sdk.connection, docs, setOptions);
                     ops += dg.ws.batchSize*dg.ws.creates/100;
                     if(trackFailures && result.size()>0)
                         try {
@@ -148,7 +164,9 @@ public class WorkLoadGenerate extends Task{
                 List<Tuple2<String, Object>> docs = dg.nextUpdateBatch();
                 if (docs.size()>0) {
                     flag = true;
-                    List<Result> result = docops.bulkUpsert(this.sdk.connection, docs, upsertOptions);
+                    List<Result> result = docOpsRest.bulkUpsert(this.restSDKClient, this.sdk.bucket, this.sdk.scope,
+                            this.sdk.collection, docs, 60, "seconds", this.retryStrategy, this.durability);
+                    //List<Result> result = docops.bulkUpsert(this.sdk.connection, docs, upsertOptions);
                     ops += dg.ws.batchSize*dg.ws.updates/100;
                     if(trackFailures && result.size()>0)
                         try {
@@ -162,7 +180,9 @@ public class WorkLoadGenerate extends Task{
                 List<Tuple2<String, Object>> docs = dg.nextExpiryBatch();
                 if (docs.size()>0) {
                     flag = true;
-                    List<Result> result = docops.bulkUpsert(this.sdk.connection, docs, expiryOptions);
+                    List<Result> result = docOpsRest.bulkUpsert(this.restSDKClient, this.sdk.bucket, this.sdk.scope,
+                            this.sdk.collection, docs, 60, "seconds", this.retryStrategy, this.durability);
+                    //List<Result> result = docops.bulkUpsert(this.sdk.connection, docs, expiryOptions);
                     ops += dg.ws.batchSize*dg.ws.expiry/100;
                     if(trackFailures && result.size()>0)
                         try {
@@ -176,7 +196,9 @@ public class WorkLoadGenerate extends Task{
                 List<String> docs = dg.nextDeleteBatch();
                 if (docs.size()>0) {
                     flag = true;
-                    List<Result> result = docops.bulkDelete(this.sdk.connection, docs, removeOptions);
+                    List<Result> result = docOpsRest.bulkDelete(this.restSDKClient, this.sdk.bucket, this.sdk.scope,
+                            this.sdk.collection, docs, 60, "seconds", this.retryStrategy, this.durability);
+                    //List<Result> result = docops.bulkDelete(this.sdk.connection, docs, removeOptions);
                     ops += dg.ws.batchSize*dg.ws.deletes/100;
                     if(trackFailures && result.size()>0)
                         try {
@@ -190,7 +212,9 @@ public class WorkLoadGenerate extends Task{
                 List<Tuple2<String, Object>> docs = dg.nextReadBatch();
                 if (docs.size()>0) {
                     flag = true;
-                    List<Tuple2<String, Object>> res = docops.bulkGets(this.sdk.connection, docs, getOptions);
+                    List<Tuple2<String, Object>> res = docOpsRest.bulkGets(this.restSDKClient, this.sdk.bucket, this.sdk.scope,
+                            this.sdk.collection, docs, 60, "seconds", this.retryStrategy);
+                    //List<Tuple2<String, Object>> res = docops.bulkGets(this.sdk.connection, docs, getOptions);
                     if (this.dg.ws.validate) {
                         Map<Object, Object> trnx_res = res.stream().collect(Collectors.toMap(t -> t.get(0), t -> t.get(1)));
                         Map<Object, Object> trnx_docs = docs.stream().collect(Collectors.toMap(t -> t.get(0), t -> t.get(1)));
@@ -205,7 +229,8 @@ public class WorkLoadGenerate extends Task{
                                         System.out.println("Validation failed for key: " + this.sdk.scope + ":" + this.sdk.collection + ":" + name);
                                         System.out.println("Actual Value - " + a);
                                         System.out.println("Expected Value - " + b);
-                                        this.sdk.disconnectCluster();
+                                        this.restSDKClient.disconnectCluster();
+                                        //this.sdk.disconnectCluster();
                                         System.out.println(this.taskName + " is completed!");
                                         return;
                                     }
@@ -213,7 +238,8 @@ public class WorkLoadGenerate extends Task{
                                     System.out.println("Validation failed for key: " + this.sdk.scope + ":" + this.sdk.collection + ":" + name);
                                     System.out.println("Actual Value - " + a);
                                     System.out.println("Expected Value - " + b);
-                                    this.sdk.disconnectCluster();
+                                    this.restSDKClient.disconnectCluster();
+                                    //this.sdk.disconnectCluster();
                                     System.out.println(this.taskName + " is completed!");
                                     return;
                                 }

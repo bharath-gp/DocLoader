@@ -153,6 +153,12 @@ public class Loader {
         Option mutate = new Option("mutate", true, "mutate");
         options.addOption(mutate);
 
+        Option SDKServer = new Option("sdk_server", true, "SDK server URL");
+        options.addOption(SDKServer);
+
+        Option SDKServerLocation = new Option("sdk_server_location", true, "Location for SDK server jar to run the SDK server");
+        options.addOption(SDKServerLocation);
+
         HelpFormatter formatter = new HelpFormatter();
         CommandLineParser parser = new DefaultParser();
         CommandLine cmd;
@@ -188,6 +194,8 @@ public class Loader {
                 Boolean.parseBoolean(cmd.getOptionValue("deleted", "false")),
                 Integer.parseInt(cmd.getOptionValue("mutate", "0"))
                 );
+        String sdkServer = cmd.getOptionValue("sdk_server", "0.0.0.0:8080");
+        String sdkServerLocation = cmd.getOptionValue("sdk_server_location", "");
         HashMap<String, Number> dr = new HashMap<String, Number>();
         dr.put(DRConstants.create_s, Long.parseLong(cmd.getOptionValue(DRConstants.create_s, "0")));
         dr.put(DRConstants.create_e ,Long.parseLong(cmd.getOptionValue(DRConstants.create_e, "0")));
@@ -218,7 +226,7 @@ public class Loader {
                 		cmd.getOptionValue("collection", "_default"));
                 client.initialiseSDK();
                 String th_name = "Loader" + i;
-                tm.submit(new WorkLoadGenerate(th_name, dg, client, cmd.getOptionValue("durability", "NONE"), 0, "seconds", true, 0, null));
+                tm.submit(new WorkLoadGenerate(th_name, dg, client, cmd.getOptionValue("durability", "NONE"), 0, "seconds", true, 0, null, sdkServer, sdkServerLocation));
                 TimeUnit.MILLISECONDS.sleep(500);
             } catch (Exception e) {
                 e.printStackTrace();
