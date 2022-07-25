@@ -2,7 +2,7 @@
 
 Run:
 ```
-mvn compile exec:java -Dexec.mainClass="couchbase.test.sdk.Loader" -Dexec.args="-n <ip> -user <username> -pwd <password> -b <bucket-name> -p 11210 -create_s 0 -create_e 10000000 -cr 100 -ops 100000 -docSize 1024 -scope <> -collection <>"
+mvn compile exec:java -Dexec.mainClass="couchbase.test.sdk.Loader" -Dexec.args="-n <ip> -user <username> -pwd <password> -b <bucket-name> -p 11210 -create_s 0 -create_e 10000000 -cr 100 -ops 100000 -docSize 1024 -scope <> -collection <> -sdk_server <> -sdk_server_location <>"
 ```
 
 ```
@@ -26,6 +26,7 @@ usage: Supported Options
  -keySize,--keySize <arg>       Size of the key
  -keyType,--keyType <arg>       Random/Sequential/Reverse
  -loadType,--loadType <arg>     Hot/Cold
+ -mutate <arg>                  mutate
  -n,--node <arg>                IP Address
  -ops,--ops <arg>               Ops/Sec
  -p,--port <arg>                Memcached Port
@@ -36,6 +37,9 @@ usage: Supported Options
  -replace_e,--replace_w <arg>   Replace End
  -replace_s,--replace_s <arg>   Replace Start
  -scope <arg>                   Scope
+ -sdk_server <arg>              SDK server URL
+ -sdk_server_location <arg>     Location for SDK server jar to run the SDK
+                                server
  -touch_e,--touch_e <arg>       Touch End
  -touch_s,--touch_s <arg>       Touch Start
  -transaction_patterns <arg>    Transaction load pattern
